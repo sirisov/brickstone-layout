@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Простой визуализатор раскладки брусчатки">
+    <title>Визуализатор раскладки брусчатки</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.3/font/bootstrap-icons.css">
+    <style>
+        .input-group-text {
+            background-color: #f8f9fa;
+        }
+        .btn-outline-light {
+            --bs-btn-color: #c8c9ca;
+        }
+    </style>
+</head>
+    <body>
+        <div class="container">
+            <p class="h1">Визуализация раскладки брусчатки</p>
+            <hr>
+            <div class="row">
+                <div class="col-md-5"><canvas id="canvas"></canvas></div>
+                <div class="col-md-2 text-center">
+                    <label class="form-label h6">Варианты раскладки</label>
+                    <div class="list-group btn-group" data-toggle="buttons" id="types">
+
+                    </div>
+                </div>
+                <div class="col-md-2 text-center">
+                    <label class="form-label h6 ">Узор</label>
+                    <div class="list-group btn-group" data-toggle="buttons" id="patterns" >
+
+                    </div>
+                </div>
+                <div class="col-md-2 text-center">
+                        <label class="form-label h6">Цвета брусчатки</label>
+                        <div class="list-group" id="colors-group">
+                            <div class="list-group-item p-0 border-0">
+                                <div class="input-group">
+                                    <button type="button" class="btn btn-light w-25" id="add-color" onclick="addColor();draw()">
+                                        <i class="bi bi-plus-circle"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-light w-75" onclick="draw()">Обновить</button>
+                                </div>
+                            </div>
+                            <div class="list-group-item p-0 border-0" id="color-template" style="display: none" data-type="template">
+                                <div class="input-group">
+                                    <div class="input-group-text border-0">
+                                        <input class="form-check-input mt-0" type="checkbox" value="" aria-label="Checkbox for following text input" checked>
+                                    </div>
+
+                                    <input type="color" class="form-control form-control-color border-0 text-bg-light" value="${color}" title="Choose your color">
+
+                                </div>
+                            </div>
+                        </div>
+                </div>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2" crossorigin="anonymous"></script>
+        <script>
+
+            const start_colors = ['#707070', '#990000', '#cccc00', '#4d4d4d' ];
+            var colors = [];
+
+            const STONES = {
+                HORIZONTAL: (x, y) => roundedRect(height * x - offset, height * y - offset, width - 1, height - 1, 2),
+                VERTICAL: (x, y) => roundedRect(height * x - offset, height * y - offset, height - 1, width - 1, 2),
+                NULL : (x, y) => {}
+            }
+
+            const TYPES = {
+                spruce: [ STONES.HORIZONTAL, STONES.NULL, STONES.VERTICAL, STONES.NULL ],
+                wall: [ STONES.HORIZONTAL, STONES.NULL],
+                checkmate: [
+                    STONES.HORIZONTAL, STONES.NULL, STONES.VERTICAL, STONES.VERTICAL,
+                    STONES.HORIZONTAL, STONES.NULL, STONES.NULL, STONES.NULL,
+                ],
+                zebra: [
+                    STONES.HORIZONTAL, STONES.NULL, STONES.VERTICAL,
+                    STONES.HORIZONTAL, STONES.NULL, STONES.NULL,
+                ]
+            }
+
+            const CALC = {
+                spruce: (i,j,l) => (i+j)%l,
+                wall: (i,j,l) => (i+j)%l,
+                checkmate: (i,j,l) => (j%2)*l/2 + (i + Math.floor((j%4)/2)*2)%(l/2),
+                zebra: (i,j,l) => (j%2)*l/2 + (i + Math.floor((j%4)/2)*2)%(l/2)
+            }
+
+
+            var canvas = document.getElementById("canvas");
+            var ctx = canvas.getContext("2d");
+            const scale = 0.2;
+            const columns = 20, rows = 20, width = 200 * scale, height = 100 * scale;
+            const offset = height;
+            canvas.height = (columns - 1) * height - 1;
+            canvas.width = (rows - 1) * height - 1;
+
+            var currentType = TYPES.spruce;
+            var currentCalc = CALC.spruce;
+
+            function roundedRect(x, y, width, height, radius) {
+                ctx.fill(new Path2D(`M ${x + radius} ${y} H ${x + width - radius} a ${radius} ${radius} 0 0 1 ${radius} ${radius} V ${y + height - radius} a ${radius} ${radius} 0 0 1 ${-radius} ${radius} H ${x + radius} a ${radius} ${radius} 0 0 1 ${-radius} ${-radius} V ${y + radius} a ${radius} ${radius} 0 0 1 ${radius} ${-radius}`));
+            }
+
+            function getRandomColor() {
+                var checkedColors = colors.filter(c => c.checked);
+                return checkedColors[Math.floor(Math.random()*checkedColors.length)].color;
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (var j = 0; j < rows; j++) {
+                    for (var i = 0; i < columns; i++) {
+                        var value = currentType[currentCalc(i,j,currentType.length)];
+                        var color = getRandomColor();
+                        ctx.fillStyle = color;
+                        value(i, j);
+                    }
+                }
+            }
+
+            function setType(type) {
+                currentType = TYPES[type.value];
+                currentCalc = CALC[type.value];
+                draw();
+            }
+
+            function addType(type) {
+                var types = document.getElementById('types');
+                types.innerHTML += `
+                        <input type="radio" class="btn-check" name="type" id="${type}" value="${type}" autocomplete="off" onclick="setType(${type})" ${type === 'spruce' ? 'checked' : ''}>
+                        <label class="btn btn-outline-light" for="${type}">${type}</label>
+                `
+            }
+
+            function addPattern(pattern) {
+                var patterns = document.getElementById('patterns');
+                patterns.innerHTML += `
+                        <input type="radio" class="btn-check" name="pattern" id="${pattern}" value="${pattern}" autocomplete="off" onclick="setPattern(${pattern})" ${pattern === 'random' ? 'checked' : ''}>
+                        <label class="btn btn-outline-light" for="${pattern}">${pattern}</label>
+                `
+            }
+
+            function addColor(color = '#c0c0c0', i = colors.length) {
+                var colorsEl = document.getElementById('colors-group')
+                var tempNode = document.querySelector("div[data-type='template']").cloneNode(true); //true for deep clone
+                tempNode.querySelector("input[type=checkbox]").addEventListener("click", e => {colors[i].checked = e.currentTarget.checked; draw()});
+                let colorPicker = tempNode.querySelector("input[type=color]");
+                colorPicker.value = color;
+                colorPicker.addEventListener('input', event => {colors[i].color = event.currentTarget.value; draw()});
+                tempNode.style.display = "block";
+                colorsEl.appendChild(tempNode);
+                if (i == colors.length)
+                    colors.push({color: color, checked: true});
+            }
+
+            Object.keys(TYPES).forEach(t => addType(t));
+            start_colors.forEach(addColor);
+            addPattern("random")
+
+            draw();
+
+        </script>
+    </body>
+</html>
